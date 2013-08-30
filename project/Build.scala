@@ -1,16 +1,16 @@
 import sbt._
 import Keys._
 
-object MinimalBuild extends Build {
+object Build extends Build {
 
-  lazy val buildVersion =  "2.1.3"
+  lazy val playVersion =  "2.1.3"
 
-  lazy val play =  "play" %% "play" % buildVersion
+  lazy val play =  "play" %% "play" % playVersion
 //
   lazy val root = Project(id = "play-forms-improved", base = file(".")).settings(
-    version := buildVersion,
+    version := playVersion + "_0.0.1-SNAPSHOT",
 
-  libraryDependencies += "com.naumen" %% "scala-reflective-utils" % "0.0.1-SNAPSHOT" ,
+  libraryDependencies += "com.naumen" %% "forms-dsl" % "0.0.1-SNAPSHOT" ,
 
   libraryDependencies += "org.specs2" %% "specs2" % "2.1.1" % "test",
 
