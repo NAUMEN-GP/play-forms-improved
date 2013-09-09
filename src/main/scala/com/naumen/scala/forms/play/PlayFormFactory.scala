@@ -193,10 +193,10 @@ class ExtendedForm[T](fields: Map[String, MappingFieldBuilder[_]], filledForm: O
       valueOrMultiValue.left.getOrElse(valueOrMultiValue.right.toOption.flatMap(x => x.toSeq.headOption)))
     val fieldBuilderAttrs: Map[String, Any] = fields(normalizedKey).propertyMap
 
-    val attrs: Map[String, Any] = valueOrMultiValue.right.toOption.map {
+    val attrs: Map[String, Any] = fieldBuilderAttrs ++ valueOrMultiValue.right.toOption.map {
       mv =>
-        fieldBuilderAttrs + ("_customValue" -> mv)
-    }.getOrElse(fieldBuilderAttrs)
+        Map("_customValue" -> mv)
+    }.getOrElse(Nil)
 
     new ExtendedField(this, field, new FieldExtension(attrs))
   }
