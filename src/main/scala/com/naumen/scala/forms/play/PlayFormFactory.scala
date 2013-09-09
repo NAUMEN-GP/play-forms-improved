@@ -9,6 +9,7 @@ import scala._
 import scala.Some
 import com.naumen.scala.forms.FormDescriptionBuilder
 import com.naumen.scala.forms.FormDescription
+import com.naumen.scala.forms.extensions.FieldAttributes._
 
 object PlayFormFactory {
 
@@ -49,7 +50,6 @@ object PlayFormFactory {
   }
 
   def elementaryMapping(clazz: Class[_])(implicit fieldDescription: FieldDescription): Mapping[_] = {
-    import PlayFormDescription._
     clazz match {
       case ClassOfString => Forms.text(getInt(MinLength), getIntOpt(MaxLength).getOrElse(Int.MaxValue))
       case ClassOfInt => Forms.number
