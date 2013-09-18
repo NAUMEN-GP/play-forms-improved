@@ -3,7 +3,7 @@ import Keys._
 
 object Build extends Build {
 
-  lazy val playVersion =  "2.1.3"
+  lazy val playVersion =  "2.1.4"
 
   lazy val play =  "play" %% "play" % playVersion
 //
