@@ -51,7 +51,7 @@ object PlayFormFactory {
 
   def elementaryMapping(clazz: Class[_])(implicit fieldDescription: FieldDescription): Mapping[_] = {
     clazz match {
-      case ClassOfString => Forms.text(getInt(MinLength), getIntOpt(MaxLength).getOrElse(Int.MaxValue))
+      case ClassOfString => Forms.nonEmptyText(getInt(MinLength), getIntOpt(MaxLength).getOrElse(Int.MaxValue))
       case ClassOfInt => Forms.number
       case ClassOfBoolean => Forms.boolean
       case ClassOfDate => {
@@ -201,11 +201,20 @@ class ExtendedForm[T](fields: Map[String, MappingFieldBuilder[_]], filledForm: O
     new ExtendedField(this, field, new FieldExtension(attrs))
   }
 
-  override def fill(value: T): Form[T] =
-    new ExtendedForm(fields, Some(super.fill(value)), attrs)
+    override def fill(value: T): Form[T] = copy(filledForm = Some(super.fill(value)))
 
+    override def bind(data: Map[String, String]): Form[T] = mapping.bind(data).fold(
+        errors => copy(filledForm = Some(Form[T](FormMapping[T](fields.map {
+            case (name, mfb) => name -> mfb.asInstanceOf[Mapping[Any]]
+        }.toMap), data, errors, None))),
+        value => copy(filledForm = Some(Form[T](FormMapping[T](fields.map {
+            case (name, mfb) => name -> mfb.asInstanceOf[Mapping[Any]]
+        }.toMap), data, Nil, Some(value))))
+    )
 
-
+    private def copy(fields: Map[String, MappingFieldBuilder[_]] = fields, filledForm: Option[Form[T]] = None, attrs: Map[String, Any] = attrs) = {
+        new ExtendedForm(fields, filledForm, attrs)
+    }
 
 }
 
