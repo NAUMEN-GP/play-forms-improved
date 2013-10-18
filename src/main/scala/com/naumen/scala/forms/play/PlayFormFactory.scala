@@ -97,14 +97,9 @@ case class MappingFieldBuilder[T](fieldMapping: Mapping[T], propertyMap: Map[Str
 case class FormMapping[T: Manifest](fieldMappings: Map[String, Mapping[Any]], key: String = "", constraints: Seq[Constraint[T]] = Nil)
   extends Mapping[T] with ObjectMapping {
   def bind(data: Map[String, String]): Either[Seq[FormError], T] = {
+    val preparedData = data.filterNot(_._2 == "__nothing__")
     val (errors, values) = fieldMappings.map {
-      case (name, mapping) => {
-        name -> {
-          val prefix: Mapping[Any] = mapping.withPrefix(name)
-          val bind1: Either[Seq[FormError], Any] = prefix.bind(data)
-          bind1
-        }
-      }
+      case (name, mapping) => name -> mapping.withPrefix(name).bind(preparedData)
     }.partition {
       case (_, either) => either.isLeft
     }
