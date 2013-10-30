@@ -207,6 +207,10 @@ class ExtendedForm[T](fields: Map[String, MappingFieldBuilder[_]], filledForm: O
         }.toMap), data, Nil, Some(value))))
     )
 
+    override def withError(error: FormError): Form[T] = copy(filledForm = Some(Form[T](FormMapping[T](fields.map {
+        case (name, mfb) => name -> mfb.asInstanceOf[Mapping[Any]]
+    }.toMap), data, errors :+ error, value)))
+
     private def copy(fields: Map[String, MappingFieldBuilder[_]] = fields, filledForm: Option[Form[T]] = None, attrs: Map[String, Any] = attrs) = {
         new ExtendedForm(fields, filledForm, attrs)
     }
