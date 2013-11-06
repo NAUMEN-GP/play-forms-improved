@@ -13,11 +13,6 @@ import com.naumen.scala.forms.extensions.FieldAttributes._
 import scala.collection.mutable
 
 object PlayFormFactory {
-    def form[T: Manifest](formFoo: FormDescriptionBuilder[T] => FormDescriptionBuilder[T], formConstraints: Constraint[T]*) =
-        PlayFormFactory(customValidators = Map()).form[T](formFoo, formConstraints: _*)
-}
-
-case class PlayFormFactory(customValidators: Map[String, Seq[Any] => Constraint[_]]) {
 
     def form[T: Manifest](formFoo: FormDescriptionBuilder[T] => FormDescriptionBuilder[T], formConstraints: Constraint[T]*) = {
         produceForm(FormBuilderDsl.form[T](formFoo).build, formConstraints)
@@ -60,11 +55,8 @@ case class PlayFormFactory(customValidators: Map[String, Seq[Any] => Constraint[
   }
 
     def elementaryMapping(clazz: Class[_])(implicit fieldDescription: FieldDescription): Mapping[_] = {
-        val validators = (for (
-            (propertyKey, property: Seq[_]) <- fieldDescription.propertyMap;
-            (validatorKey, validator) <- customValidators
-            if propertyKey == validatorKey
-        ) yield validator(property).asInstanceOf[Constraint[Any]]).toSeq
+
+        val constraints = fieldDescription.propertyMap.get(PlayFieldProperties.Constraints).getOrElse(Nil).asInstanceOf[Seq[Constraint[Any]]]
 
         {
             clazz match {
@@ -76,7 +68,7 @@ case class PlayFormFactory(customValidators: Map[String, Seq[Any] => Constraint[
                     Forms.date(datePattern)
                 }
             }
-        }.asInstanceOf[Mapping[Any]].verifying(validators: _*)
+        }.asInstanceOf[Mapping[Any]].verifying(constraints: _*)
 
 
     }
@@ -278,4 +270,8 @@ class ExtendedField(val form: ExtendedForm[_], field: Field, val ext: FieldExten
   }
 
 
+}
+
+object PlayFieldProperties {
+    val Constraints = "play.constraints"
 }
