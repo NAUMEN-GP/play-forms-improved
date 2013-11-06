@@ -1,25 +1,36 @@
 package com.naumen.scala.forms.play
 
-import _root_.play.api.data.validation.Constraint
+import _root_.play.api.data.validation.{Valid, ValidationError, Invalid, Constraint}
 import com.naumen.scala.forms._
 import _root_.play.api.data._
 import java.util.Date
-import com.naumen.scala.utils.ClassConverter
+import com.naumen.scala.utils.{FieldNameGetter, ClassConverter}
 import scala._
 import scala.Some
 import com.naumen.scala.forms.FormDescriptionBuilder
 import com.naumen.scala.forms.FormDescription
 import com.naumen.scala.forms.extensions.FieldAttributes._
+import scala.collection.mutable
 
 object PlayFormFactory {
+    def form[T: Manifest](formFoo: FormDescriptionBuilder[T] => FormDescriptionBuilder[T], formConstraints: Constraint[T]*) =
+        PlayFormFactory(customValidators = Map()).form[T](formFoo, formConstraints: _*)
+}
 
-  def form[T: Manifest](formFoo: FormDescriptionBuilder[T] => FormDescriptionBuilder[T]) = {
-    produceForm(FormBuilderDsl.form[T](formFoo).build)
-  }
+case class PlayFormFactory(customValidators: Map[String, Seq[Any] => Constraint[_]]) {
 
-  def produceForm[T: Manifest](formDescription: FormDescription) = {
-    new ExtendedForm[T](fields = formDescription.fields.mapValues(makeField), attrs = formDescription.attrs)
-  }
+    def form[T: Manifest](formFoo: FormDescriptionBuilder[T] => FormDescriptionBuilder[T], formConstraints: Constraint[T]*) = {
+        produceForm(FormBuilderDsl.form[T](formFoo).build, formConstraints)
+    }
+
+    def produceForm[T: Manifest](formDescription: FormDescription, formConstraints: Seq[Constraint[T]]) = {
+        new ExtendedForm[T](
+            fields = formDescription.fields.mapValues(makeField),
+            filledForm = None,
+            attrs = formDescription.attrs,
+            formConstraints = formConstraints
+        )
+    }
 
   def makeField(fieldDescription: FieldDescription) = {
     MappingFieldBuilder(
@@ -46,20 +57,29 @@ object PlayFormFactory {
       }
       case _ => elementaryMapping(fieldType)
     }
-
   }
 
-  def elementaryMapping(clazz: Class[_])(implicit fieldDescription: FieldDescription): Mapping[_] = {
-    clazz match {
-      case ClassOfString => Forms.nonEmptyText(getInt(MinLength), getIntOpt(MaxLength).getOrElse(Int.MaxValue))
-      case ClassOfInt => Forms.number
-      case ClassOfBoolean => Forms.boolean
-      case ClassOfDate => {
-        val datePattern = getString(DatePattern)
-        Forms.date(datePattern)
-      }
+    def elementaryMapping(clazz: Class[_])(implicit fieldDescription: FieldDescription): Mapping[_] = {
+        val validators = (for (
+            (propertyKey, property: Seq[_]) <- fieldDescription.propertyMap;
+            (validatorKey, validator) <- customValidators
+            if propertyKey == validatorKey
+        ) yield validator(property).asInstanceOf[Constraint[Any]]).toSeq
+
+        {
+            clazz match {
+                case ClassOfString => Forms.nonEmptyText(getInt(MinLength), getIntOpt(MaxLength).getOrElse(Int.MaxValue))
+                case ClassOfInt => Forms.number
+                case ClassOfBoolean => Forms.boolean
+                case ClassOfDate => {
+                    val datePattern = getString(DatePattern)
+                    Forms.date(datePattern)
+                }
+            }
+        }.asInstanceOf[Mapping[Any]].verifying(validators: _*)
+
+
     }
-  }
 
 
   val ClassOfString = classOf[String]
@@ -96,23 +116,22 @@ case class MappingFieldBuilder[T](fieldMapping: Mapping[T], propertyMap: Map[Str
 
 case class FormMapping[T: Manifest](fieldMappings: Map[String, Mapping[Any]], key: String = "", constraints: Seq[Constraint[T]] = Nil)
   extends Mapping[T] with ObjectMapping {
-  def bind(data: Map[String, String]): Either[Seq[FormError], T] = {
-    val preparedData = data.filterNot(_._2 == "__nothing__")
-    val (errors, values) = fieldMappings.map {
-      case (name, mapping) => name -> mapping.withPrefix(name).bind(preparedData)
-    }.partition {
-      case (_, either) => either.isLeft
-    }
+    def bind(data: Map[String, String]): Either[Seq[FormError], T] = {
+        val (errors, values) = fieldMappings.map {
+            case (name, mapping) => name -> mapping.withPrefix(name).bind(data)
+        }.partition {
+            case (_, either) => either.isLeft
+        }
 
-    if (errors.nonEmpty) {
-      Left(errors.flatMap {
-        case (_, leftError) => leftError.left.get
-      }.toSeq)
-    } else {
-      val valuesMap = values.mapValues(_.right.get)
-      Right(restoreEntity(valuesMap))
+        if (errors.nonEmpty) {
+            Left(errors.flatMap {
+                case (_, leftError) => leftError.left.get
+            }.toSeq)
+        } else {
+            val valuesMap = values.mapValues(_.right.get)
+            applyConstraints(restoreEntity(valuesMap))
+        }
     }
-  }
 
   def restoreEntity(valuesMap: Map[String, Any]): T = {
     val preparedMap = valuesMap.mapValues(_.asInstanceOf[AnyRef])
@@ -141,22 +160,52 @@ case class FormMapping[T: Manifest](fieldMappings: Map[String, Mapping[Any]], ke
     this.copy(constraints = constraints ++ addConstraints.toSeq)
   }
 
+  override protected def collectErrors(t: T): Seq[FormError] = {
+      constraints.map(_(t)).collect {
+          case Invalid(errors) => errors.toSeq
+      }.flatten.map {
+          case ve: ValidationErrorWithKey => FormError(ve.key, ve.message, ve.args)
+          case ve: ValidationError => FormError(key, ve.message, ve.args)
+      }
+
+  }
+
   val mappings: scala.Seq[Mapping[_]] = Seq(this) ++ fieldMappings.map {
     case (name, mapping) => mapping
   }
 }
 
-class ExtendedForm[T](fields: Map[String, MappingFieldBuilder[_]], filledForm: Option[Form[T]] = None, val attrs: Map[String, Any] = Map())(implicit private val mf: Manifest[T])
-  extends Form[T](
-  FormMapping[T](fields.map {
-    case (name, mfb) => name -> mfb.asInstanceOf[Mapping[Any]]
-  }.toMap), {
-    filledForm.map(_.data).getOrElse(Map.empty[String, String])
-  },
-  filledForm.map(_.errors).getOrElse(Seq.empty[FormError]),
-  filledForm.flatMap(_.value)) {
+class ValidationErrorWithKey(val key: String, wrappedError: ValidationError) extends ValidationError(wrappedError.message, wrappedError.args)
 
-  override def apply(key: String): Field = {
+class ValidationResultBuilder[T:Manifest]  extends FieldNameGetter{
+    private val errors = mutable.Stack[ValidationErrorWithKey]()
+
+    def addError(fieldFoo: T => Any)(message: String, args: Any*) =
+        errors.push(new ValidationErrorWithKey($[T](fieldFoo), ValidationError(message, args)))
+
+    def hasErrors = errors.isEmpty
+
+    def validationResult = if (errors.isEmpty) Valid
+    else Invalid.apply(errors.toList)
+
+
+}
+
+class ExtendedForm[T](fields: Map[String, MappingFieldBuilder[_]],
+                      filledForm: Option[Form[T]],
+                      val attrs: Map[String, Any],
+                      formConstraints: Seq[Constraint[T]]
+                         )(implicit private val mf: Manifest[T])
+    extends Form[T](FormMapping[T](
+        fieldMappings = fields.map {
+            case (name, mfb) => name -> mfb.asInstanceOf[Mapping[Any]]
+        }.toMap,
+        constraints = formConstraints),
+        filledForm.map(_.data).getOrElse(Map.empty[String, String]),
+        filledForm.map(_.errors).getOrElse(Seq.empty[FormError]),
+        filledForm.flatMap(_.value)) {
+
+    override def apply(key: String): Field = {
     val IndexedBrackets = "([^\\[\\]]+)\\[.*".r
     val Brackets = "([^\\[\\]]+)\\[\\]".r
     val (normalizedKey, valueOrMultiValue) =
@@ -191,7 +240,7 @@ class ExtendedForm[T](fields: Map[String, MappingFieldBuilder[_]], filledForm: O
     val attrs: Map[String, Any] = fieldBuilderAttrs ++ valueOrMultiValue.right.toOption.map {
       mv =>
         Map("_customValue" -> mv)
-    }.getOrElse(Nil)
+    }.getOrElse(Map())
 
     new ExtendedField(this, field, new FieldExtension(attrs))
   }
@@ -199,9 +248,9 @@ class ExtendedForm[T](fields: Map[String, MappingFieldBuilder[_]], filledForm: O
     override def fill(value: T): Form[T] = copy(filledForm = Some(super.fill(value)))
 
     override def bind(data: Map[String, String]): Form[T] = mapping.bind(data).fold(
-        errors => copy(filledForm = Some(Form[T](FormMapping[T](fields.map {
+        newErrors => copy(filledForm = Some(Form[T](FormMapping[T](fields.map {
             case (name, mfb) => name -> mfb.asInstanceOf[Mapping[Any]]
-        }.toMap), data, errors, None))),
+        }.toMap), data, errors ++ newErrors, None))),
         value => copy(filledForm = Some(Form[T](FormMapping[T](fields.map {
             case (name, mfb) => name -> mfb.asInstanceOf[Mapping[Any]]
         }.toMap), data, Nil, Some(value))))
@@ -212,7 +261,7 @@ class ExtendedForm[T](fields: Map[String, MappingFieldBuilder[_]], filledForm: O
     }.toMap), data, errors :+ error, value)))
 
     private def copy(fields: Map[String, MappingFieldBuilder[_]] = fields, filledForm: Option[Form[T]] = None, attrs: Map[String, Any] = attrs) = {
-        new ExtendedForm(fields, filledForm, attrs)
+        new ExtendedForm(fields, filledForm, attrs, formConstraints)
     }
 
 }
