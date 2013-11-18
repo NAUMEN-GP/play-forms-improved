@@ -9,7 +9,7 @@ import scala._
 import scala.Some
 import com.naumen.scala.forms.FormDescriptionBuilder
 import com.naumen.scala.forms.FormDescription
-import com.naumen.scala.forms.extensions.FieldAttributes._
+import com.naumen.scala.forms.extensions.FieldExtensionsAttrs._
 import scala.collection.mutable
 
 object PlayFormFactory {
@@ -64,7 +64,7 @@ object PlayFormFactory {
                 case ClassOfInt => Forms.number
                 case ClassOfBoolean => Forms.boolean
                 case ClassOfDate => {
-                    val datePattern = getString(DatePattern)
+                    val datePattern = getString(DateFormat)
                     Forms.date(datePattern)
                 }
             }
