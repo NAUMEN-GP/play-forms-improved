@@ -195,9 +195,12 @@ class ExtendedForm[T](fields: Map[String, MappingFieldBuilder[_]],
         constraints = formConstraints),
         filledForm.map(_.data).getOrElse(Map.empty[String, String]),
         filledForm.map(_.errors).getOrElse(Seq.empty[FormError]),
-        filledForm.flatMap(_.value)) {
+        filledForm.flatMap(_.value))
+    with FieldNameGetter {
 
-    override def apply(key: String): Field = {
+    def apply[F](foo: T => F): ExtendedField = apply($[T](foo))
+
+    override def apply(key: String): ExtendedField = {
     val IndexedBrackets = "([^\\[\\]]+)\\[.*".r
     val Brackets = "([^\\[\\]]+)\\[\\]".r
     val (normalizedKey, valueOrMultiValue) =
@@ -237,9 +240,9 @@ class ExtendedForm[T](fields: Map[String, MappingFieldBuilder[_]],
     new ExtendedField(this, field, new FieldExtension(attrs))
   }
 
-    override def fill(value: T): Form[T] = copy(filledForm = Some(super.fill(value)))
+    override def fill(value: T): ExtendedForm[T] = copy(filledForm = Some(super.fill(value)))
 
-    override def bind(data: Map[String, String]): Form[T] = mapping.bind(data).fold(
+    override def bind(data: Map[String, String]): ExtendedForm[T] = mapping.bind(data).fold(
         newErrors => copy(filledForm = Some(Form[T](FormMapping[T](fields.map {
             case (name, mfb) => name -> mfb.asInstanceOf[Mapping[Any]]
         }.toMap), data, errors ++ newErrors, None))),
@@ -248,7 +251,15 @@ class ExtendedForm[T](fields: Map[String, MappingFieldBuilder[_]],
         }.toMap), data, Nil, Some(value))))
     )
 
-    override def withError(error: FormError): Form[T] = copy(filledForm = Some(Form[T](FormMapping[T](fields.map {
+    override def bindFromRequest()(implicit request: _root_.play.api.mvc.Request[_]): ExtendedForm[T] =
+        super.bindFromRequest()(request).asInstanceOf[ExtendedForm[T]]
+
+    def foldExtended[R](hasErrors: ExtendedForm[T] => R, success: T => R): R = value match {
+        case Some(v) if errors.isEmpty => success(v)
+        case _ => hasErrors(this)
+    }
+
+    override def withError(error: FormError): ExtendedForm[T] = copy(filledForm = Some(Form[T](FormMapping[T](fields.map {
         case (name, mfb) => name -> mfb.asInstanceOf[Mapping[Any]]
     }.toMap), data, errors :+ error, value)))
 
