@@ -34,27 +34,46 @@ object PlayFormFactory {
     )
   }
 
-  def fieldMapping(implicit fieldDescription: FieldDescription) = {
-    val required = getBoolean(FieldDescription.Required)
-    required match {
-      case true => baseMappingBy(fieldDescription)
-      case false => Forms.optional(baseMappingBy(fieldDescription))
+    def fieldMapping(implicit fieldDescription: FieldDescription) = {
+        val fieldType = getClass(FieldDescription.FieldType)
+        if (isSeqType(fieldType)) {
+            listMapping
+        } else {
+            singularMapping
+        }
     }
-  }
 
-  def baseMappingBy(implicit fieldDescription: FieldDescription) = {
-    val fieldType = getClass(FieldDescription.FieldType)
-    fieldType match {
-      case ClassOfSeq | ClassOfList => {
+    def singularMapping(implicit fieldDescription: FieldDescription) = {
+        if (getBoolean(FieldDescription.Required)) {
+            primitiveMapping
+        } else {
+            optionalMapping
+        }
+    }
+
+    def listMapping(implicit fieldDescription: FieldDescription) = {
         val elementType = getClass(FieldDescription.ListElementType)
-        val mapping: Mapping[_] = elementaryMapping(elementType)
-        Forms.list(mapping)
-      }
-      case _ => elementaryMapping(fieldType)
+        Forms.list(primitiveMapping(elementType))
     }
-  }
 
-    def elementaryMapping(clazz: Class[_])(implicit fieldDescription: FieldDescription): Mapping[_] = {
+    def optionalMapping(implicit fieldDescription: FieldDescription) = {
+        Forms.optional(primitiveMapping)
+    }
+
+    def primitiveMapping(implicit fieldDescription: FieldDescription): Mapping[_] = {
+        val fieldType: Class[_] = getClass(FieldDescription.FieldType)
+        primitiveMapping(fieldType)
+    }
+
+    def isSeqType(fieldType: Class[_]) = {
+        fieldType match {
+            case ClassOfSeq | ClassOfList => true
+            case _ => false
+
+        }
+    }
+
+    def primitiveMapping(clazz: Class[_])(implicit fieldDescription: FieldDescription): Mapping[_] = {
 
         val constraints = fieldDescription.propertyMap.get(PlayFieldProperties.Constraints).getOrElse(Nil).asInstanceOf[Seq[Constraint[Any]]]
 
