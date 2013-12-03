@@ -81,6 +81,7 @@ object PlayFormFactory {
             clazz match {
                 case ClassOfString => Forms.nonEmptyText(getInt(MinLength), getIntOpt(MaxLength).getOrElse(Int.MaxValue))
                 case ClassOfInt => Forms.number
+                case ClassOfBigDecimal => Forms.bigDecimal
                 case ClassOfBoolean => Forms.boolean
                 case ClassOfDate => {
                     val datePattern = getString(DateFormat)
@@ -95,6 +96,7 @@ object PlayFormFactory {
 
   val ClassOfString = classOf[String]
   val ClassOfInt = classOf[Int]
+  val ClassOfBigDecimal = classOf[BigDecimal]
   val ClassOfBoolean = classOf[Boolean]
   val ClassOfDate = classOf[Date]
   val ClassOfSeq = classOf[Seq[_]]
