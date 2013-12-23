@@ -18,7 +18,7 @@ object PlayFormFactory {
         produceForm(FormBuilderDsl.form[T](formFoo).build, formConstraints)
     }
 
-    def produceForm[T: Manifest](formDescription: FormDescription, formConstraints: Seq[Constraint[T]]) = {
+    private def produceForm[T: Manifest](formDescription: FormDescription, formConstraints: Seq[Constraint[T]]) = {
         new ExtendedForm[T](
             fields = formDescription.fields.mapValues(makeField),
             filledForm = None,
@@ -27,14 +27,14 @@ object PlayFormFactory {
         )
     }
 
-  def makeField(fieldDescription: FieldDescription) = {
-    MappingFieldBuilder(
-      fieldMapping = fieldMapping(fieldDescription),
-      propertyMap = fieldDescription.propertyMap
-    )
-  }
+    private def makeField(fieldDescription: FieldDescription) = {
+        MappingFieldBuilder(
+            fieldMapping = fieldMapping(fieldDescription),
+            propertyMap = fieldDescription.propertyMap
+        )
+    }
 
-    def fieldMapping(implicit fieldDescription: FieldDescription) = {
+    private def fieldMapping(implicit fieldDescription: FieldDescription) = {
         val fieldType = getClass(FieldDescription.FieldType)
         if (isSeqType(fieldType)) {
             listMapping
@@ -43,7 +43,7 @@ object PlayFormFactory {
         }
     }
 
-    def singularMapping(implicit fieldDescription: FieldDescription) = {
+    private def singularMapping(implicit fieldDescription: FieldDescription) = {
         if (getBoolean(FieldDescription.Required)) {
             primitiveMapping
         } else {
@@ -51,21 +51,21 @@ object PlayFormFactory {
         }
     }
 
-    def listMapping(implicit fieldDescription: FieldDescription) = {
+    private def listMapping(implicit fieldDescription: FieldDescription) = {
         val elementType = getClass(FieldDescription.ListElementType)
         Forms.list(primitiveMapping(elementType))
     }
 
-    def optionalMapping(implicit fieldDescription: FieldDescription) = {
+    private def optionalMapping(implicit fieldDescription: FieldDescription) = {
         Forms.optional(primitiveMapping)
     }
 
-    def primitiveMapping(implicit fieldDescription: FieldDescription): Mapping[_] = {
+    private def primitiveMapping(implicit fieldDescription: FieldDescription): Mapping[_] = {
         val fieldType: Class[_] = getClass(FieldDescription.FieldType)
         primitiveMapping(fieldType)
     }
 
-    def isSeqType(fieldType: Class[_]) = {
+    private def isSeqType(fieldType: Class[_]) = {
         fieldType match {
             case ClassOfSeq | ClassOfList => true
             case _ => false
@@ -73,7 +73,7 @@ object PlayFormFactory {
         }
     }
 
-    def primitiveMapping(clazz: Class[_])(implicit fieldDescription: FieldDescription): Mapping[_] = {
+    private def primitiveMapping(clazz: Class[_])(implicit fieldDescription: FieldDescription): Mapping[_] = {
 
         val constraints = fieldDescription.propertyMap.get(PlayFieldProperties.Constraints).getOrElse(Nil).asInstanceOf[Seq[Constraint[Any]]]
 
@@ -94,41 +94,43 @@ object PlayFormFactory {
     }
 
 
-  val ClassOfString = classOf[String]
-  val ClassOfInt = classOf[Int]
-  val ClassOfBigDecimal = classOf[BigDecimal]
-  val ClassOfBoolean = classOf[Boolean]
-  val ClassOfDate = classOf[Date]
-  val ClassOfSeq = classOf[Seq[_]]
-  val ClassOfList = classOf[List[_]]
+    val ClassOfString = classOf[String]
+    val ClassOfInt = classOf[Int]
+    val ClassOfBigDecimal = classOf[BigDecimal]
+    val ClassOfBoolean = classOf[Boolean]
+    val ClassOfDate = classOf[Date]
+    val ClassOfSeq = classOf[Seq[_]]
+    val ClassOfList = classOf[List[_]]
 
-  private def getClass(key: String)(implicit fieldDescription: FieldDescription) = fieldDescription.propertyMap.get(key).get.asInstanceOf[Class[_]]
+    private def getClass(key: String)(implicit fieldDescription: FieldDescription) = fieldDescription.propertyMap.get(key).get.asInstanceOf[Class[_]]
 
-  private def getString(key: String)(implicit fieldDescription: FieldDescription) = fieldDescription.propertyMap.get(key).orNull.asInstanceOf[String]
-  private def getInt(key: String)(implicit fieldDescription: FieldDescription) = fieldDescription.propertyMap.get(key).getOrElse(0).asInstanceOf[Int]
-  private def getIntOpt(key: String)(implicit fieldDescription: FieldDescription) = fieldDescription.propertyMap.get(key).asInstanceOf[Option[Int]]
+    private def getString(key: String)(implicit fieldDescription: FieldDescription) = fieldDescription.propertyMap.get(key).orNull.asInstanceOf[String]
 
-  private def getBoolean(key: String)(implicit fieldDescription: FieldDescription) = fieldDescription.propertyMap.get(key).getOrElse(false).asInstanceOf[Boolean]
+    private def getInt(key: String)(implicit fieldDescription: FieldDescription) = fieldDescription.propertyMap.get(key).getOrElse(0).asInstanceOf[Int]
+
+    private def getIntOpt(key: String)(implicit fieldDescription: FieldDescription) = fieldDescription.propertyMap.get(key).asInstanceOf[Option[Int]]
+
+    private def getBoolean(key: String)(implicit fieldDescription: FieldDescription) = fieldDescription.propertyMap.get(key).getOrElse(false).asInstanceOf[Boolean]
 }
 
 case class MappingFieldBuilder[T](fieldMapping: Mapping[T], propertyMap: Map[String, Any]) extends Mapping[T] {
-  type Self = MappingFieldBuilder[T]
+    type Self = MappingFieldBuilder[T]
 
-  val key: String = fieldMapping.key
-  val mappings: Seq[Mapping[_]] = fieldMapping.mappings
-  val constraints: Seq[Constraint[T]] = fieldMapping.constraints
+    val key: String = fieldMapping.key
+    val mappings: Seq[Mapping[_]] = fieldMapping.mappings
+    val constraints: Seq[Constraint[T]] = fieldMapping.constraints
 
-  def bind(data: Map[String, String]): Either[Seq[FormError], T] = fieldMapping.bind(data)
+    def bind(data: Map[String, String]): Either[Seq[FormError], T] = fieldMapping.bind(data)
 
-  def unbind(value: T): (Map[String, String], Seq[FormError]) = fieldMapping.unbind(value)
+    def unbind(value: T): (Map[String, String], Seq[FormError]) = fieldMapping.unbind(value)
 
-  def withPrefix(prefix: String): Self = copy(fieldMapping = fieldMapping.withPrefix(prefix))
+    def withPrefix(prefix: String): Self = copy(fieldMapping = fieldMapping.withPrefix(prefix))
 
-  def verifying(constraints: Constraint[T]*): Self = copy(fieldMapping = fieldMapping.verifying(constraints: _*))
+    def verifying(constraints: Constraint[T]*): Self = copy(fieldMapping = fieldMapping.verifying(constraints: _*))
 }
 
 case class FormMapping[T: Manifest](fieldMappings: Map[String, Mapping[Any]], key: String = "", constraints: Seq[Constraint[T]] = Nil)
-  extends Mapping[T] with ObjectMapping {
+    extends Mapping[T] with ObjectMapping {
     def bind(data: Map[String, String]): Either[Seq[FormError], T] = {
         val (errors, values) = fieldMappings.map {
             case (name, mapping) => name -> mapping.withPrefix(name).bind(data)
@@ -146,51 +148,51 @@ case class FormMapping[T: Manifest](fieldMappings: Map[String, Mapping[Any]], ke
         }
     }
 
-  def restoreEntity(valuesMap: Map[String, Any]): T = {
-    val preparedMap = valuesMap.mapValues(_.asInstanceOf[AnyRef])
-    ClassConverter.toInstanceOf[T](preparedMap)
-  }
-
-  def unbind(entity: T): (Map[String, String], Seq[FormError]) = {
-    val fieldValues = toFieldValuesMap(entity)
-    fieldMappings.map {
-      case (name, mapping) =>
-        val value: Any = fieldValues.get(name).get
-        val unbound: (Map[String, String], Seq[FormError]) = mapping.withPrefix(name).unbind(value)
-        unbound
-    }.foldLeft((Map[String, String](), Seq[FormError]())) {
-      case (a, (valueMap, errors)) => (a._1 ++ valueMap) -> (a._2 ++ errors)
+    def restoreEntity(valuesMap: Map[String, Any]): T = {
+        val preparedMap = valuesMap.mapValues(_.asInstanceOf[AnyRef])
+        ClassConverter.toInstanceOf[T](preparedMap)
     }
-  }
 
-  def toFieldValuesMap(entity: T): Map[String, Any] = {
-    ClassConverter.toMap(entity.asInstanceOf[AnyRef])
-  }
+    def unbind(entity: T): (Map[String, String], Seq[FormError]) = {
+        val fieldValues = toFieldValuesMap(entity)
+        fieldMappings.map {
+            case (name, mapping) =>
+                val value: Any = fieldValues.get(name).get
+                val unbound: (Map[String, String], Seq[FormError]) = mapping.withPrefix(name).unbind(value)
+                unbound
+        }.foldLeft((Map[String, String](), Seq[FormError]())) {
+            case (a, (valueMap, errors)) => (a._1 ++ valueMap) -> (a._2 ++ errors)
+        }
+    }
 
-  def withPrefix(prefix: String): Mapping[T] = this.copy(key = addPrefix(prefix).getOrElse(key))
+    def toFieldValuesMap(entity: T): Map[String, Any] = {
+        ClassConverter.toMap(entity.asInstanceOf[AnyRef])
+    }
 
-  def verifying(addConstraints: Constraint[T]*) = {
-    this.copy(constraints = constraints ++ addConstraints.toSeq)
-  }
+    def withPrefix(prefix: String): Mapping[T] = this.copy(key = addPrefix(prefix).getOrElse(key))
 
-  override protected def collectErrors(t: T): Seq[FormError] = {
-      constraints.map(_(t)).collect {
-          case Invalid(errors) => errors.toSeq
-      }.flatten.map {
-          case ve: ValidationErrorWithKey => FormError(ve.key, ve.message, ve.args)
-          case ve: ValidationError => FormError(key, ve.message, ve.args)
-      }
+    def verifying(addConstraints: Constraint[T]*) = {
+        this.copy(constraints = constraints ++ addConstraints.toSeq)
+    }
 
-  }
+    override protected def collectErrors(t: T): Seq[FormError] = {
+        constraints.map(_(t)).collect {
+            case Invalid(errors) => errors.toSeq
+        }.flatten.map {
+            case ve: ValidationErrorWithKey => FormError(ve.key, ve.message, ve.args)
+            case ve: ValidationError => FormError(key, ve.message, ve.args)
+        }
 
-  val mappings: scala.Seq[Mapping[_]] = Seq(this) ++ fieldMappings.map {
-    case (name, mapping) => mapping
-  }
+    }
+
+    val mappings: scala.Seq[Mapping[_]] = Seq(this) ++ fieldMappings.map {
+        case (name, mapping) => mapping
+    }
 }
 
 class ValidationErrorWithKey(val key: String, wrappedError: ValidationError) extends ValidationError(wrappedError.message, wrappedError.args)
 
-class ValidationResultBuilder[T:Manifest]  extends FieldNameGetter{
+class ValidationResultBuilder[T: Manifest] extends FieldNameGetter {
     private val errors = mutable.Stack[ValidationErrorWithKey]()
 
     def addError(fieldFoo: T => Any)(message: String, args: Any*) =
@@ -222,44 +224,44 @@ class ExtendedForm[T](fields: Map[String, MappingFieldBuilder[_]],
     def apply[F](foo: T => F): ExtendedField = apply($[T](foo))
 
     override def apply(key: String): ExtendedField = {
-    val IndexedBrackets = "([^\\[\\]]+)\\[.*".r
-    val Brackets = "([^\\[\\]]+)\\[\\]".r
-    val (normalizedKey, valueOrMultiValue) =
-      key match {
-        case Brackets(normalKey) => {
-          normalKey -> Right(data.collect {
-            case (k, v) if k.startsWith(normalKey) => v
-          })
-        }
+        val IndexedBrackets = "([^\\[\\]]+)\\[.*".r
+        val Brackets = "([^\\[\\]]+)\\[\\]".r
+        val (normalizedKey, valueOrMultiValue) =
+            key match {
+                case Brackets(normalKey) => {
+                    normalKey -> Right(data.collect {
+                        case (k, v) if k.startsWith(normalKey) => v
+                    })
+                }
 
-        case k @ IndexedBrackets(normalKey) => {
-          normalKey -> Left(data.get(key))
-        }
+                case k@IndexedBrackets(normalKey) => {
+                    normalKey -> Left(data.get(key))
+                }
 
-        case _ =>  key -> Left(data.get(key))
+                case _ => key -> Left(data.get(key))
 
-      }
+            }
 
 
 
-    val field: Field = Field(
-      this,
-      key,
-      constraints.get(normalizedKey).getOrElse(Nil),
-      formats.get(normalizedKey),
-      errors.collect {
-        case e if e.key == normalizedKey => e
-      },
-      valueOrMultiValue.left.getOrElse(valueOrMultiValue.right.toOption.flatMap(x => x.toSeq.headOption)))
-    val fieldBuilderAttrs: Map[String, Any] = fields(normalizedKey).propertyMap
+        val field: Field = Field(
+            this,
+            key,
+            constraints.get(normalizedKey).getOrElse(Nil),
+            formats.get(normalizedKey),
+            errors.collect {
+                case e if e.key == normalizedKey => e
+            },
+            valueOrMultiValue.left.getOrElse(valueOrMultiValue.right.toOption.flatMap(x => x.toSeq.headOption)))
+        val fieldBuilderAttrs: Map[String, Any] = fields(normalizedKey).propertyMap
 
-    val attrs: Map[String, Any] = fieldBuilderAttrs ++ valueOrMultiValue.right.toOption.map {
-      mv =>
-        Map("_customValue" -> mv)
-    }.getOrElse(Map())
+        val attrs: Map[String, Any] = fieldBuilderAttrs ++ valueOrMultiValue.right.toOption.map {
+            mv =>
+                Map("_customValue" -> mv)
+        }.getOrElse(Map())
 
-    new ExtendedField(this, field, new FieldExtension(attrs))
-  }
+        new ExtendedField(this, field, new FieldExtension(attrs))
+    }
 
     override def fill(value: T): ExtendedForm[T] = copy(filledForm = Some(super.fill(value)))
 
@@ -294,12 +296,12 @@ case class FieldExtension(attrs: Map[String, Any])
 
 
 class ExtendedField(val form: ExtendedForm[_], field: Field, val ext: FieldExtension)
-  extends Field(form, field.name, field.constraints, field.format, field.errors, field.value) {
+    extends Field(form, field.name, field.constraints, field.format, field.errors, field.value) {
 
-  override def apply(key: String): Field = {
-    val key1: String = Option(name).filterNot(_.isEmpty).map(_ + (if (key(0) == '[') "" else ".")).getOrElse("") + key
-    form(key1)
-  }
+    override def apply(key: String): Field = {
+        val key1: String = Option(name).filterNot(_.isEmpty).map(_ + (if (key(0) == '[') "" else ".")).getOrElse("") + key
+        form(key1)
+    }
 
 
 }
