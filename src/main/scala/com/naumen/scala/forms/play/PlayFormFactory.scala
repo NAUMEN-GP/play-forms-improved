@@ -57,7 +57,7 @@ object PlayFormFactory {
     }
 
     private def optionalMapping(implicit fieldDescription: FieldDescription) = {
-        Forms.optional(primitiveMapping)
+        OptionalMapping_Fix(primitiveMapping)
     }
 
     private def primitiveMapping(implicit fieldDescription: FieldDescription): Mapping[_] = {
@@ -127,83 +127,6 @@ case class MappingFieldBuilder[T](fieldMapping: Mapping[T], propertyMap: Map[Str
     def withPrefix(prefix: String): Self = copy(fieldMapping = fieldMapping.withPrefix(prefix))
 
     def verifying(constraints: Constraint[T]*): Self = copy(fieldMapping = fieldMapping.verifying(constraints: _*))
-}
-
-case class FormMapping[T: Manifest](fieldMappings: Map[String, Mapping[Any]], key: String = "", constraints: Seq[Constraint[T]] = Nil)
-    extends Mapping[T] with ObjectMapping {
-    def bind(data: Map[String, String]): Either[Seq[FormError], T] = {
-        val (errors, values) = fieldMappings.map {
-            case (name, mapping) => name -> mapping.withPrefix(name).bind(data)
-        }.partition {
-            case (_, either) => either.isLeft
-        }
-
-        if (errors.nonEmpty) {
-            Left(errors.flatMap {
-                case (_, leftError) => leftError.left.get
-            }.toSeq)
-        } else {
-            val valuesMap = values.mapValues(_.right.get)
-            applyConstraints(restoreEntity(valuesMap))
-        }
-    }
-
-    def restoreEntity(valuesMap: Map[String, Any]): T = {
-        val preparedMap = valuesMap.mapValues(_.asInstanceOf[AnyRef])
-        ClassConverter.toInstanceOf[T](preparedMap)
-    }
-
-    def unbind(entity: T): (Map[String, String], Seq[FormError]) = {
-        val fieldValues = toFieldValuesMap(entity)
-        fieldMappings.map {
-            case (name, mapping) =>
-                val value: Any = fieldValues.get(name).get
-                val unbound: (Map[String, String], Seq[FormError]) = mapping.withPrefix(name).unbind(value)
-                unbound
-        }.foldLeft((Map[String, String](), Seq[FormError]())) {
-            case (a, (valueMap, errors)) => (a._1 ++ valueMap) -> (a._2 ++ errors)
-        }
-    }
-
-    def toFieldValuesMap(entity: T): Map[String, Any] = {
-        ClassConverter.toMap(entity.asInstanceOf[AnyRef])
-    }
-
-    def withPrefix(prefix: String): Mapping[T] = this.copy(key = addPrefix(prefix).getOrElse(key))
-
-    def verifying(addConstraints: Constraint[T]*) = {
-        this.copy(constraints = constraints ++ addConstraints.toSeq)
-    }
-
-    override protected def collectErrors(t: T): Seq[FormError] = {
-        constraints.map(_(t)).collect {
-            case Invalid(errors) => errors.toSeq
-        }.flatten.map {
-            case ve: ValidationErrorWithKey => FormError(ve.key, ve.message, ve.args)
-            case ve: ValidationError => FormError(key, ve.message, ve.args)
-        }
-
-    }
-
-    val mappings: scala.Seq[Mapping[_]] = Seq(this) ++ fieldMappings.map {
-        case (name, mapping) => mapping
-    }
-}
-
-class ValidationErrorWithKey(val key: String, wrappedError: ValidationError) extends ValidationError(wrappedError.message, wrappedError.args)
-
-class ValidationResultBuilder[T: Manifest] extends FieldNameGetter {
-    private val errors = mutable.Stack[ValidationErrorWithKey]()
-
-    def addError(fieldFoo: T => Any)(message: String, args: Any*) =
-        errors.push(new ValidationErrorWithKey($[T](fieldFoo), ValidationError(message, args)))
-
-    def hasErrors = errors.isEmpty
-
-    def validationResult = if (errors.isEmpty) Valid
-    else Invalid.apply(errors.toList)
-
-
 }
 
 class ExtendedForm[T](fields: Map[String, MappingFieldBuilder[_]],
