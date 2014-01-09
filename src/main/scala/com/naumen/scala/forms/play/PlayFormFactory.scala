@@ -1,25 +1,16 @@
 package com.naumen.scala.forms.play
 
-import _root_.play.api.data.Field
-import _root_.play.api.data.FormError
 import _root_.play.api.data.validation._
 import com.naumen.scala.forms._
 import _root_.play.api.data._
 import java.util.Date
 import com.naumen.scala.utils.{FieldNameGetter, ClassConverter}
 import scala._
-import scala.Some
-import com.naumen.scala.forms.FormDescriptionBuilder
-import com.naumen.scala.forms.FormDescription
 import com.naumen.scala.forms.extensions.FieldExtensionsAttrs._
 import scala.collection.mutable
 import scala.Some
 import com.naumen.scala.forms.FormDescriptionBuilder
 import com.naumen.scala.forms.FormDescription
-import com.naumen.scala.forms.play.OptionalMapping_Fix
-import com.naumen.scala.forms.play.FormMapping
-import com.naumen.scala.forms.play.MappingFieldBuilder
-import com.naumen.scala.forms.play.FieldExtension
 
 object PlayFormFactory {
 
