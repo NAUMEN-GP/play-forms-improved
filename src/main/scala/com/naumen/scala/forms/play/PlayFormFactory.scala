@@ -45,7 +45,7 @@ object PlayFormFactory {
 
     private def singularMapping(implicit fieldDescription: FieldDescription) = {
         if (getBoolean(FieldDescription.Required)) {
-            primitiveMapping
+            primitiveMapping(getConstraints)
         } else {
             optionalMapping
         }
@@ -53,16 +53,16 @@ object PlayFormFactory {
 
     private def listMapping(implicit fieldDescription: FieldDescription) = {
         val elementType = getClass(FieldDescription.ListElementType)
-        Forms.list(primitiveMapping(elementType))
+        Forms.list(primitiveMapping(elementType, constraints = Nil)).verifying(getConstraints:_*)
     }
 
     private def optionalMapping(implicit fieldDescription: FieldDescription) = {
-        Forms.optional(primitiveMapping)
+        Forms.optional(primitiveMapping(getConstraints))
     }
 
-    private def primitiveMapping(implicit fieldDescription: FieldDescription): Mapping[_] = {
+    private def primitiveMapping(constraints: Seq[Constraint[Any]])(implicit fieldDescription: FieldDescription): Mapping[_] = {
         val fieldType: Class[_] = getClass(FieldDescription.FieldType)
-        primitiveMapping(fieldType)
+        primitiveMapping(fieldType, constraints)
     }
 
     private def isSeqType(fieldType: Class[_]) = {
@@ -73,9 +73,11 @@ object PlayFormFactory {
         }
     }
 
-    private def primitiveMapping(clazz: Class[_])(implicit fieldDescription: FieldDescription): Mapping[_] = {
+    private def getConstraints(implicit fieldDescription: FieldDescription) = {
+        fieldDescription.propertyMap.get(PlayFieldProperties.Constraints).getOrElse(Nil).asInstanceOf[Seq[Constraint[Any]]]
+    }
 
-        val constraints = fieldDescription.propertyMap.get(PlayFieldProperties.Constraints).getOrElse(Nil).asInstanceOf[Seq[Constraint[Any]]]
+    private def primitiveMapping(clazz: Class[_], constraints: Seq[Constraint[Any]])(implicit fieldDescription: FieldDescription): Mapping[_] = {
 
         {
             val textMapping = Forms.text(getInt(MinLength), getIntOpt(MaxLength).getOrElse(Int.MaxValue))
@@ -193,6 +195,7 @@ case class FormMapping[T: Manifest](fieldMappings: Map[String, Mapping[Any]], ke
 
 class ValidationErrorWithKey(val key: String, wrappedError: ValidationError) extends ValidationError(wrappedError.message, wrappedError.args)
 
+
 class ValidationResultBuilder[T: Manifest] extends FieldNameGetter {
     private val errors = mutable.Stack[ValidationErrorWithKey]()
 
@@ -305,6 +308,10 @@ class ExtendedField(val form: ExtendedForm[_], field: Field, val ext: FieldExten
     }
 
 
+}
+
+object PlayFieldProperties {
+    val Constraints = "play.constraints"
 }
 
 object PlayFieldProperties {
