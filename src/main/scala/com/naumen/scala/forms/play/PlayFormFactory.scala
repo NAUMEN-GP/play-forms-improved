@@ -195,7 +195,6 @@ case class FormMapping[T: Manifest](fieldMappings: Map[String, Mapping[Any]], ke
 
 class ValidationErrorWithKey(val key: String, wrappedError: ValidationError) extends ValidationError(wrappedError.message, wrappedError.args)
 
-
 class ValidationResultBuilder[T: Manifest] extends FieldNameGetter {
     private val errors = mutable.Stack[ValidationErrorWithKey]()
 
@@ -308,10 +307,6 @@ class ExtendedField(val form: ExtendedForm[_], field: Field, val ext: FieldExten
     }
 
 
-}
-
-object PlayFieldProperties {
-    val Constraints = "play.constraints"
 }
 
 object PlayFieldProperties {
