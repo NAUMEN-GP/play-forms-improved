@@ -1,9 +1,12 @@
 package com.naumen.scala.forms.play
 
+import java.text.NumberFormat
+
+import _root_.play.api.data.format.{Formats, Formatter}
 import _root_.play.api.data.validation._
 import com.naumen.scala.forms._
 import _root_.play.api.data._
-import java.util.Date
+import java.util.{Locale, Date}
 import com.naumen.scala.utils.{FieldNameGetter, ClassConverter}
 import scala._
 import com.naumen.scala.forms.extensions.FieldExtensionsAttrs._
@@ -11,6 +14,7 @@ import scala.collection.mutable
 import scala.Some
 import com.naumen.scala.forms.FormDescriptionBuilder
 import com.naumen.scala.forms.FormDescription
+import scala.collection.convert.WrapAsScala._
 
 object PlayFormFactory {
 
@@ -84,7 +88,7 @@ object PlayFormFactory {
             clazz match {
                 case ClassOfString => if (getBoolean(FieldDescription.Required)) textMapping verifying Constraints.nonEmpty else textMapping
                 case ClassOfInt => Forms.number
-                case ClassOfBigDecimal => Forms.bigDecimal
+                case ClassOfBigDecimal => Forms.of[BigDecimal](ruBigDecimalFormat)
                 case ClassOfBoolean => Forms.boolean
                 case ClassOfDate => {
                     val datePattern = getString(DateFormat)
@@ -114,6 +118,42 @@ object PlayFormFactory {
     private def getIntOpt(key: String)(implicit fieldDescription: FieldDescription) = fieldDescription.propertyMap.get(key).asInstanceOf[Option[Int]]
 
     private def getBoolean(key: String)(implicit fieldDescription: FieldDescription) = fieldDescription.propertyMap.get(key).getOrElse(false).asInstanceOf[Boolean]
+
+    def ruBigDecimalFormat = localizedBigDecimalFormat(locale = new Locale("ru"))
+
+    def localizedBigDecimalFormat(precision: Option[(Int, Int)] = None, locale: Locale = Locale.getDefault): Formatter[BigDecimal] = new Formatter[BigDecimal] {
+
+        override val format = Some(("format.real", Nil))
+
+        private val formatter = NumberFormat.getInstance(locale)
+
+        def bind(key: String, data: Map[String, String]) = {
+            Formats.stringFormat.bind(key, data).right.flatMap { s =>
+                scala.util.control.Exception.allCatch[BigDecimal]
+                    .either {
+                    val bd = BigDecimal(formatter.parse(s).doubleValue)
+                    precision.map({
+                        case (p, s) =>
+                            if (bd.precision - bd.scale > p - s) {
+                                throw new java.lang.ArithmeticException("Invalid precision")
+                            }
+                            bd.setScale(s)
+                    }).getOrElse(bd)
+                }
+                    .left.map { e =>
+                    Seq(
+                        precision match {
+                            case Some((p, s)) => FormError(key, "error.real.precision", Seq(p, s))
+                            case None => FormError(key, "error.real", Nil)
+                        }
+                    )
+                }
+            }
+        }
+
+        def unbind(key: String, value: BigDecimal) = Map(key -> formatter.format(precision.map({ p => value.setScale(p._2) }).getOrElse(value)))
+    }
+
 }
 
 case class MappingFieldBuilder[T](fieldMapping: Mapping[T], propertyMap: Map[String, Any]) extends Mapping[T] {
