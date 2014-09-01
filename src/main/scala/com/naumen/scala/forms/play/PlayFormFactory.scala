@@ -1,20 +1,15 @@
 package com.naumen.scala.forms.play
 
 import java.text.NumberFormat
-
+import java.util.{Date, Locale}
+import _root_.play.api.data._
 import _root_.play.api.data.format.{Formats, Formatter}
 import _root_.play.api.data.validation._
-import com.naumen.scala.forms._
-import _root_.play.api.data._
-import java.util.{Locale, Date}
-import com.naumen.scala.utils.{FieldNameGetter, ClassConverter}
-import scala._
+import com.naumen.scala.forms.{FormDescription, FormDescriptionBuilder, _}
 import com.naumen.scala.forms.extensions.FieldExtensionsAttrs._
+import com.naumen.scala.utils.{ClassConverter, FieldNameGetter}
+
 import scala.collection.mutable
-import scala.Some
-import com.naumen.scala.forms.FormDescriptionBuilder
-import com.naumen.scala.forms.FormDescription
-import scala.collection.convert.WrapAsScala._
 
 object PlayFormFactory {
 
@@ -165,7 +160,9 @@ case class MappingFieldBuilder[T](fieldMapping: Mapping[T], propertyMap: Map[Str
 
     def bind(data: Map[String, String]): Either[Seq[FormError], T] = fieldMapping.bind(data)
 
-    def unbind(value: T): (Map[String, String], Seq[FormError]) = fieldMapping.unbind(value)
+    def unbind(value: T): Map[String, String] = fieldMapping.unbind(value)
+
+    def unbindAndValidate(value: T): (Map[String, String], Seq[FormError]) = fieldMapping.unbindAndValidate(value)
 
     def withPrefix(prefix: String): Self = copy(fieldMapping = fieldMapping.withPrefix(prefix))
 
@@ -196,14 +193,24 @@ case class FormMapping[T: Manifest](fieldMappings: Map[String, Mapping[Any]], ke
         ClassConverter.toInstanceOf[T](preparedMap)
     }
 
-    def unbind(entity: T): (Map[String, String], Seq[FormError]) = {
+    def unbind(entity: T) = {
         val fieldValues = toFieldValuesMap(entity)
         fieldMappings.map {
             case (name, mapping) =>
                 val value: Any = fieldValues.get(name).get
-                val unbound: (Map[String, String], Seq[FormError]) = mapping.withPrefix(name).unbind(value)
+                val unbound: Map[String, String] = mapping.withPrefix(name).unbind(value)
                 unbound
-        }.foldLeft((Map[String, String](), Seq[FormError]())) {
+        }.fold(Map.empty)(_ ++ _)
+    }
+
+    def unbindAndValidate(entity: T): (Map[String, String], Seq[FormError]) = {
+        val fieldValues = toFieldValuesMap(entity)
+        fieldMappings.map {
+            case (name, mapping) =>
+                val value: Any = fieldValues.get(name).get
+                val unbound: (Map[String, String], Seq[FormError]) = mapping.withPrefix(name).unbindAndValidate(value)
+                unbound
+        }.foldLeft((Map.empty[String, String], Seq.empty[FormError])) {
             case (a, (valueMap, errors)) => (a._1 ++ valueMap) -> (a._2 ++ errors)
         }
     }
