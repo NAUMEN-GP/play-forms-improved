@@ -240,7 +240,7 @@ case class FormMapping[T: Manifest](fieldMappings: Map[String, Mapping[Any]], ke
     }
 }
 
-class ValidationErrorWithKey(val key: String, wrappedError: ValidationError) extends ValidationError(wrappedError.message, wrappedError.args)
+class ValidationErrorWithKey(val key: String, wrappedError: ValidationError) extends ValidationError(wrappedError.message, wrappedError.args:_*)
 
 class ValidationResultBuilder[T: Manifest] extends FieldNameGetter {
     private val errors = mutable.Stack[ValidationErrorWithKey]()
