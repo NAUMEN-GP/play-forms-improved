@@ -87,13 +87,23 @@ object PlayFormFactory {
                 case ClassOfBoolean => Forms.boolean
                 case ClassOfDate => {
                     val datePattern = getString(DateFormat)
-                    Forms.date(datePattern)
+                    date(datePattern)
                 }
             }
         }.asInstanceOf[Mapping[Any]].verifying(constraints: _*)
 
 
     }
+
+    def date(pattern: String, timeZone: java.util.TimeZone = java.util.TimeZone.getDefault): Mapping[java.util.Date] = FieldMapping[Date]()(new Formatter[Date] {        override val format = Some(("format.date", Seq(pattern)))
+
+        val jodaTimeZone = org.joda.time.DateTimeZone.forTimeZone(timeZone)
+        val formatter = org.joda.time.format.DateTimeFormat.forPattern(pattern).withZone(jodaTimeZone)
+
+        def bind(key: String, data: Map[String, String]) = Formats.dateFormat(pattern,timeZone).bind(key,data)
+        def unbind(key: String, value: Date) =
+            Map(key -> (if(value != null) formatter.print(new org.joda.time.DateTime(value).withZone(jodaTimeZone)) else ""))
+    })
 
 
     val ClassOfString = classOf[String]
