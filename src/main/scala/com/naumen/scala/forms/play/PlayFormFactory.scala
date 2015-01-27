@@ -95,8 +95,9 @@ object PlayFormFactory {
 
     }
 
-    def date(pattern: String, timeZone: java.util.TimeZone = java.util.TimeZone.getDefault): Mapping[java.util.Date] = FieldMapping[Date]()(new Formatter[Date] {        override val format = Some(("format.date", Seq(pattern)))
+    def date(pattern: String, timeZone: java.util.TimeZone = java.util.TimeZone.getDefault): Mapping[java.util.Date] = FieldMapping[Date]()(new Formatter[Date] {
 
+        override val format = Some(("format.date", Seq(pattern)))
         val jodaTimeZone = org.joda.time.DateTimeZone.forTimeZone(timeZone)
         val formatter = org.joda.time.format.DateTimeFormat.forPattern(pattern).withZone(jodaTimeZone)
 
