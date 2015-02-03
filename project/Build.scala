@@ -12,8 +12,7 @@ object Build extends Build {
 
         libraryDependencies += "com.naumen" %% "forms-dsl" % "0.0.1-SNAPSHOT",
 
-        resolvers ++= Seq("snapshots" at "http://oss.sonatype.org/content/repositories/snapshots",
-            "releases" at "http://oss.sonatype.org/content/repositories/releases"),
+        resolvers += Resolver.sonatypeRepo("releases"),
 
         organization := "com.naumen",
         libraryDependencies += play,
