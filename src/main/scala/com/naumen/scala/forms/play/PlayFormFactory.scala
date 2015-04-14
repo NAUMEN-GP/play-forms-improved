@@ -1,14 +1,13 @@
 package com.naumen.scala.forms.play
 
-import java.text.NumberFormat
-import java.util.{Date, Locale}
 import _root_.play.api.data._
 import _root_.play.api.data.format.{Formats, Formatter}
 import _root_.play.api.data.validation._
-import com.naumen.scala.forms.{FormDescription, FormDescriptionBuilder, _}
 import com.naumen.scala.forms.extensions.FieldExtensionsAttrs._
+import com.naumen.scala.forms.{FormDescription, FormDescriptionBuilder, _}
 import com.naumen.scala.utils.{ClassConverter, FieldNameGetter}
-
+import java.text.NumberFormat
+import java.util.{Date, Locale}
 import scala.collection.mutable
 
 object PlayFormFactory {
@@ -324,13 +323,13 @@ class ExtendedForm[T](fields: Map[String, MappingFieldBuilder[_]],
         new ExtendedField(this, field, new FieldExtension(attrs))
     }
 
-    override def fill(value: T): ExtendedForm[T] = copy(filledForm = Some(super.fill(value)))
+    override def fill(value: T): ExtendedForm[T] = copyForm(filledForm = Some(super.fill(value)))
 
     override def bind(data: Map[String, String]): ExtendedForm[T] = mapping.bind(data).fold(
-        newErrors => copy(filledForm = Some(Form[T](FormMapping[T](fields.map {
+        newErrors => copyForm(filledForm = Some(Form[T](FormMapping[T](fields.map {
             case (name, mfb) => name -> mfb.asInstanceOf[Mapping[Any]]
         }.toMap), data, errors ++ newErrors, None))),
-        value => copy(filledForm = Some(Form[T](FormMapping[T](fields.map {
+        value => copyForm(filledForm = Some(Form[T](FormMapping[T](fields.map {
             case (name, mfb) => name -> mfb.asInstanceOf[Mapping[Any]]
         }.toMap), data, Nil, Some(value))))
     )
@@ -343,11 +342,11 @@ class ExtendedForm[T](fields: Map[String, MappingFieldBuilder[_]],
         case _ => hasErrors(this)
     }
 
-    override def withError(error: FormError): ExtendedForm[T] = copy(filledForm = Some(Form[T](FormMapping[T](fields.map {
+    override def withError(error: FormError): ExtendedForm[T] = copyForm(filledForm = Some(Form[T](FormMapping[T](fields.map {
         case (name, mfb) => name -> mfb.asInstanceOf[Mapping[Any]]
     }.toMap), data, errors :+ error, value)))
 
-    private def copy(fields: Map[String, MappingFieldBuilder[_]] = fields, filledForm: Option[Form[T]] = None, attrs: Map[String, Any] = attrs) = {
+    private def copyForm(fields: Map[String, MappingFieldBuilder[_]] = fields, filledForm: Option[Form[T]] = None, attrs: Map[String, Any] = attrs) = {
         new ExtendedForm(fields, filledForm, attrs, formConstraints)
     }
 
